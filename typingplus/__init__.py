@@ -14,6 +14,7 @@ Functions:
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+from typing import Any as _StdAny
 import collections
 import functools
 import inspect
@@ -258,8 +259,7 @@ def cast(tp, obj):
             pass
     type_repr = _type_repr(tp)
     six.raise_from(
-        TypeError(
-            "Cannot convert '{}' to {}.".format(obj_repr, type_repr)),
+        TypeError("Cannot convert {} to {}.".format(obj_repr, type_repr)),
         locals().get('e')
     )
 
@@ -283,7 +283,7 @@ def _get_cast_types(type_):
             type_._abc_registry,
             key=lambda k: k.__name__,
             reverse=True))
-    if hasattr(type_, '__extra__'):
+    if hasattr(type_, '__extra__') and type_.__extra__:
         if isinstance(type_.__extra__, type):
             cast_types.append(type_.__extra__)
         if hasattr(type_.__extra__, '_abc_registry'):
@@ -308,14 +308,29 @@ def _is_instance(obj, type_):
     Returns:
         True if the object is an instance of the type; otherwise, False.
     """
-    if type_ is Any:
+    if type_ in (Any, _StdAny):
         return True
-    is_generic = (isinstance(type_, type) and issubclass(type_, Generic) and
-                  hasattr(type_, '__args__') and type_.__args__)
-    if not is_generic and isinstance(type_, type) and isinstance(obj, type_):
-        return True
-    is_constrained = hasattr(type_, '__constraints__')
-    return is_constrained and any(
+    if isinstance(type_, type):
+        if hasattr(type_, '__args__') and type_.__args__:
+            generic_type = (type_.__origin__ if hasattr(
+                type_, '__origin__') and type_.__origin__ else type_)
+            if issubclass(type_, tuple) and Ellipsis not in type_.__args__:
+                return (len(obj) == len(type_.__args__) and
+                        isinstance(obj, generic_type) and all(
+                            _is_instance(val, typ) for typ, val in
+                            zip(type_.__args__, obj)))
+            elif issubclass(type_, Mapping):
+                return isinstance(obj, generic_type) and all(
+                    _is_instance(k, type_.__args__[0]) and
+                    _is_instance(v, type_.__args__[1]) for
+                    k, v in six.iteritems(obj)
+                )
+            elif issubclass(type_, Iterable):
+                return isinstance(obj, generic_type) and all(
+                    _is_instance(v, type_.__args__[0]) for v in obj)
+        elif isinstance(obj, type_):
+            return True
+    return hasattr(type_, '__constraints__') and any(
         isinstance(obj, typ) for typ in type_.__constraints__)
 
 

@@ -14,7 +14,6 @@ Functions:
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from typing import Any as _StdAny
 import collections
 import functools
 import inspect
@@ -308,7 +307,7 @@ def _is_instance(obj, type_):
     Returns:
         True if the object is an instance of the type; otherwise, False.
     """
-    if type_ in (Any, _StdAny):
+    if type_ == Any:
         return True
     if isinstance(type_, type):
         if hasattr(type_, '__args__') and type_.__args__:

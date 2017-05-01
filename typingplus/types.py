@@ -385,7 +385,7 @@ class _ValidationBoundedMeta(_BoundedMeta):
 
         Args:
             args: A tuple with one or two parameters: A type to cast the
-                valie passed, and a predicate function to use for bounds
+                value passed, and a predicate function to use for bounds
                 checking.
 
         Returns:

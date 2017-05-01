@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# pragma pylint: disable=bad-mcs-classmethod-argument
 """A module for handling with typing and type hints.
 
 Classes:
@@ -81,7 +82,7 @@ class _ClsReprMeta(type):
         """Return a custom string for the type repr if defined."""
         if cls.__class_repr__:
             return cls.__class_repr__
-        return super(cls.__class__, cls).__repr__()
+        return super(_ClsReprMeta, cls).__repr__()
 
 
 class _BoundedMeta(Uninstantiable):
@@ -221,10 +222,9 @@ class _BoundedMeta(Uninstantiable):
             return '{}.{}[{}, {}, {}]'.format(
                 cls.__module__, cls.__name__, cls._get_fullname(type_),
                 cls._get_bound_repr(bound), keyfunc_name)
-        else:
-            return '{}.{}[{}, {}]'.format(
-                cls.__module__, cls.__name__, cls._get_fullname(type_),
-                cls._get_bound_repr(bound))
+        return '{}.{}[{}, {}]'.format(
+            cls.__module__, cls.__name__, cls._get_fullname(type_),
+            cls._get_bound_repr(bound))
 
     def _get_args(cls, args):
         # type: (tuple) -> Tuple[Any, slice, Callable]
@@ -418,9 +418,8 @@ class _ValidationBoundedMeta(_BoundedMeta):
             return '{}.{}[{}, {}]'.format(
                 cls.__module__, cls.__name__, cls._get_fullname(type_),
                 keyfunc_name)
-        else:
-            return '{}.{}[{}]'.format(
-                cls.__module__, cls.__name__, keyfunc_name)
+        return '{}.{}[{}]'.format(
+            cls.__module__, cls.__name__, keyfunc_name)
 
 
 @six.add_metaclass(_ValidationBoundedMeta)

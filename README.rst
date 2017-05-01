@@ -44,5 +44,5 @@ Upcoming Features
    :target: https://pypi.python.org/pypi/typingplus/
 .. |Python Versions| image:: https://img.shields.io/pypi/pyversions/typingplus.svg
    :target: https://pypi.python.org/pypi/typingplus/
-.. |Code Quality| image:: https://api.codacy.com/project/badge/Grade/bfa6fff942654a27b4dc153e2876a111
-   :target: https://www.codacy.com/app/contains-io/typingplus?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=dangle/typingplus&amp;utm_campaign=Badge_Grade
+.. |Code Quality| image:: https://api.codacy.com/project/badge/Grade/ccf7fb925d32499f80a1cfb8a640436b
+   :target: https://www.codacy.com/app/contains-io/typingplus?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=contains-io/typingplus&amp;utm_campaign=Badge_Grade

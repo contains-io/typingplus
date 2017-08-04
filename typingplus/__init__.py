@@ -240,8 +240,7 @@ def cast(tp, obj):
         obj: The value to cast.
 
     Returns:
-        The cast value if it was possible to determine the type and cast it;
-        otherwise, the original value.
+        The cast value if it was possible to determine the type and cast it.
     """
     if _is_instance(obj, tp):
         return obj
@@ -253,6 +252,10 @@ def cast(tp, obj):
             obj = _cast_iterables(tp, obj)
     for type_ in _get_cast_types(tp):
         try:
+            args = getattr(type_, '__args__', None)
+            constraints = getattr(type_, '__constraints__', None)
+            if args or constraints:
+                return cast(type_, obj)
             return type_(obj)
         except Exception as e:  # pylint: disable=broad-except,unused-variable
             pass
@@ -277,6 +280,9 @@ def _get_cast_types(type_):
     if (hasattr(type_, '__constraints__') and
             isinstance(type_.__constraints__, Iterable)):
         cast_types.extend(type_.__constraints__)
+    if (hasattr(type_, '__args__') and
+            isinstance(type_.__args__, Iterable)):
+        cast_types.extend(type_.__args__)
     if hasattr(type_, '_abc_registry'):
         cast_types.extend(sorted(  # Give list and tuple precedence.
             type_._abc_registry,

@@ -361,10 +361,10 @@ def _cast_iterables(type_, obj):
             'The number of elements [{}] does not match the type {}'.format(
                 len(obj), _type_repr(type_)))
     if issubclass(type_, Mapping):
-        return (
-            [cast(type_.__args__[0], k), cast(type_.__args__[1], v)]
+        return {
+            cast(type_.__args__[0], k): cast(type_.__args__[1], v)
             for k, v in six.iteritems(obj)
-        )
+        }
     if issubclass(type_, Iterable):
         return [cast(type_.__args__[0], v) for v in obj]
     return obj

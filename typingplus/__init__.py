@@ -329,8 +329,8 @@ def _is_instance(obj, type_):
                     _is_instance(v, type_.__args__[0]) for v in obj)
         elif isinstance(obj, type_):
             return True
-    args = getattr(type_, '__args__', getattr(type_, '__constraints__', ()))
-    return any(isinstance(obj, typ) for typ in args)
+    args = getattr(type_, '__args__', getattr(type_, '__constraints__', None))
+    return any(isinstance(obj, typ) for typ in args or ())
 
 
 def _cast_iterables(type_, obj):

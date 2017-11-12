@@ -24,7 +24,7 @@ Features
 - Contains all of the typing library, and is guaranteed to use the latest
   installed version of the ``typing`` library, even if the version of Python in
   use has an older version of ``typing``.
-- `typing_extensions` is integrated to be as compatible with the future of the
+- ``typing_extensions`` is integrated to be as compatible with the future of the
   ``typing`` module as possible.
 - Support for comment type hints.
 - A functional cast method, including to the abstract types defined in the

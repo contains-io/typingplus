@@ -269,7 +269,7 @@ def cast(tp, obj):
             return type_(obj)
         except Exception as e:  # pylint: disable=broad-except,unused-variable
             pass
-    type_repr = _type_repr(tp)
+    type_repr = repr(tp)
     six.raise_from(
         TypeError("Cannot convert {} to {}.".format(obj_repr, type_repr)),
         locals().get('e')
@@ -369,7 +369,7 @@ def _cast_iterables(type_, obj):
             return [cast(typ, val) for typ, val in zip(type_.__args__, obj)]
         raise TypeError(
             'The number of elements [{}] does not match the type {}'.format(
-                len(obj), _type_repr(type_)))
+                len(obj), repr(type_)))
     if issubclass(type_, Mapping):
         return {
             cast(type_.__args__[0], k): cast(type_.__args__[1], v)

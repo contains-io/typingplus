@@ -3,8 +3,9 @@ typingplus
 
 |PyPI| |Python Versions| |Build Status| |Coverage Status| |Code Quality|
 
-*An enhanced version of the Python 3.5 typing library with additional
-validation types.*
+*An enhanced version of the Python typing library that always uses the latest
+version of typing available, regardless of which version of Python is in
+use.*
 
 
 Installation
@@ -20,18 +21,28 @@ Install it using pip:
 Features
 --------
 
-- Contains all of the typing library, and guaranteed to be compatible with the
-  Python 3.5.3 version or later.
-- A functional cast method.
+- Contains all of the typing library, and is guaranteed to use the latest
+  installed version of the ``typing`` library, even if the version of Python in
+  use has an older version of ``typing``.
+- `typing_extensions` is integrated to be as compatible with the future of the
+  ``typing`` module as possible.
 - Support for comment type hints.
-- Validation types that can be used while casting to validate an object's
-  content.
+- A functional cast method, including to the abstract types defined in the
+  ``typing`` module.
+- An is_instance method that works with the abstract types defined in the
+  ``typing`` module.
 
 
 Upcoming Features
 -----------------
 
 - Comment type hints for classes.
+
+
+Usage
+-----
+
+See `PEP 484`_.
 
 
 .. _PEP 484: https://www.python.org/dev/peps/pep-0484/

@@ -5,7 +5,6 @@
 from __future__ import unicode_literals
 
 from setuptools import setup
-from setuptools import find_packages
 
 
 setup(
@@ -13,14 +12,16 @@ setup(
     use_scm_version=True,
     description='An enhanced typing library with casting and validation.',
     long_description=open('README.rst').read(),
-    author='Dangle Nuño',
+    author='Melissa Nuño',
     author_email='dangle@contains.io',
     url='https://github.com/contains-io/typingplus',
-    keywords=['typing', 'schema' 'validation', 'types'],
+    keywords=['typing', 'schema' 'validation', 'types', 'pep484',
+              'annotations', 'type comments'],
     license='MIT',
-    packages=find_packages(exclude=['tests', 'docs']),
+    py_modules=['typingplus'],
     install_requires=[
         'typing >= 3.5.3',
+        'typing_extensions >= 3.6.2',
         'six >= 1.10.0'
     ],
     setup_requires=[
@@ -30,9 +31,9 @@ setup(
         'pytest-runner',
         'setuptools_scm',
     ],
-    tests_require=['pytest >= 3.0'],
+    tests_require=['pytest >= 3.2'],
     classifiers=[
-        'Development Status :: 5 - Production/Stable',
+        'Development Status :: 3 - Alpha',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
         'Programming Language :: Python',

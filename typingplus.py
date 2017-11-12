@@ -2,12 +2,14 @@
 """A module for handling with typing and type hints.
 
 In addition to the functions below, it also exports everything that the typing
-module exports.
+and typing_extensions modules export.
 
 Functions:
     cast: Casts a value to a specific type.
     get_type_hints: Gets all type hints for an object, including comment type
         hints.
+    is_instance: An implementation of isinstance that works with the type
+        definitions from the typing library.
 """
 # pragma pylint: disable=undefined-variable
 
@@ -21,29 +23,37 @@ import re
 import sys
 import tokenize
 
+import pkg_resources
 import six
 
-from .types import NoneType
-
-if (3, 5) <= sys.version_info < (3, 5, 3):
+_typing_backport_version = tuple(
+    int(v) for v in pkg_resources.get_distribution('typing').version.split('.')
+)
+if (3, 5) <= sys.version_info < _typing_backport_version:
     # Load the typing backport instead of the built-in typing library.
     #
-    # Python 3.5 versions before 3.5.3 have a different version of the typing
-    # library than those using the finalized typing library or the backport.
-    #
-    # In order to assure that the backport is loaded from site-packages,
-    # sys.path must be reversed.
+    # In order to assure that the latest version (backport) is loaded from
+    # site-packages sys.path must be reversed.
     import imp
     _path = list(reversed(sys.path))
     _mod_info = imp.find_module('typing', _path)
     typing = imp.load_module('typing', *_mod_info)
 else:
     import typing
-
 globals().update(  # Super wildcard import.
     {k: v for k, v in six.iteritems(vars(typing)) if k not in globals()}
 )
 globals()['__all__'] = tuple(str(v) for v in globals()['__all__'])
+
+import typing_extensions  # pylint: disable=wrong-import-position
+globals().update(  # Super wildcard import.
+    {k: v for k, v in six.iteritems(vars(typing_extensions))
+     if k not in globals()}
+)
+globals()['__all__'] += tuple(str(v) for v in globals()['__all__'])
+
+globals()['__all__'] += ('is_instance',)
+
 _get_type_hints = typing.get_type_hints
 
 _STRING_TYPES = six.string_types + (ByteString,)
@@ -82,7 +92,7 @@ def get_type_hints(obj,  # type: Any
         defaults = _get_func_defaults(obj)
         for name, value in six.iteritems(hints):
             if value is None:
-                value = NoneType
+                value = type(None)
             if isinstance(value, six.string_types):
                 value = _ForwardRef(value)
             value = _eval_type(
@@ -242,7 +252,7 @@ def cast(tp, obj):
     Returns:
         The cast value if it was possible to determine the type and cast it.
     """
-    if _is_instance(obj, tp):
+    if is_instance(obj, tp):
         return obj
     obj_repr = repr(obj)
     if isinstance(tp, type):
@@ -299,7 +309,7 @@ def _get_cast_types(type_):
     return cast_types
 
 
-def _is_instance(obj, type_):
+def is_instance(obj, type_):
     # type: (Any, Type) -> bool
     """Determine if an object is an instance of a type.
 
@@ -322,21 +332,21 @@ def _is_instance(obj, type_):
             if issubclass(type_, tuple) and Ellipsis not in type_.__args__:
                 return (len(obj) == len(type_.__args__) and
                         isinstance(obj, generic_type) and all(
-                            _is_instance(val, typ) for typ, val in
+                            is_instance(val, typ) for typ, val in
                             zip(type_.__args__, obj)))
             elif issubclass(type_, Mapping):
                 return isinstance(obj, generic_type) and all(
-                    _is_instance(k, type_.__args__[0]) and
-                    _is_instance(v, type_.__args__[1]) for
+                    is_instance(k, type_.__args__[0]) and
+                    is_instance(v, type_.__args__[1]) for
                     k, v in six.iteritems(obj)
                 )
             elif issubclass(type_, Iterable):
                 return isinstance(obj, generic_type) and all(
-                    _is_instance(v, type_.__args__[0]) for v in obj)
+                    is_instance(v, type_.__args__[0]) for v in obj)
         elif isinstance(obj, type_):
             return True
     args = getattr(type_, '__args__', getattr(type_, '__constraints__', None))
-    return any(_is_instance(obj, typ) for typ in args or ())
+    return any(is_instance(obj, typ) for typ in args or ())
 
 
 def _cast_iterables(type_, obj):

@@ -205,9 +205,9 @@ def _get_type_comments(source):
     name = last_token = None
     tokens = tokenize.generate_tokens(reader)
     for token, value, _, _, _ in tokens:
-        if token == tokenize.INDENT:
+        if token in (tokenize.INDENT, tokenize.DEDENT):
             return
-        if token == tokenize.NAME:
+        if token == tokenize.NAME and last_token != tokenize.OP:
             name = value
         elif token == tokenize.COMMENT:
             match = re.match(r'#\s*type:(.+)', value)

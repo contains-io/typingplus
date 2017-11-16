@@ -62,10 +62,12 @@ def test_short_form_optional():
 
 def test_long_form():
     """Test type hinting with long-form comments."""
+    from typing import Optional
+
     def func(arg1,
              arg2,  # type: int
              arg3,  # type: str
-             arg4
+             arg4 = None  # type: str
              ):
         # type: (...) -> bool
         pass
@@ -73,7 +75,8 @@ def test_long_form():
     assert get_type_hints(func, globals(), locals()) == {
         'return': bool,
         'arg2': int,
-        'arg3': str
+        'arg3': str,
+        'arg4': Optional[str]
     }
 
 

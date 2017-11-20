@@ -22,6 +22,7 @@ import inspect
 import re
 import sys
 import tokenize
+import types
 
 import pkg_resources
 import six
@@ -83,24 +84,22 @@ def get_type_hints(obj,  # type: Any
     Returns:
         A mapping of value names to type hints.
     """
-    globalns, localns = _get_namespace(obj, globalns, localns)
-    hints = _get_type_hints(obj, globalns, localns) or {}
+    hints = {}
+    try:
+        if not isinstance(obj, type):
+            hints = _get_type_hints(obj, globalns, localns) or {}
+    except TypeError:
+        if not isinstance(obj, _STRING_TYPES):
+            raise
     if not hints and not getattr(obj, '__no_type_check__', None):
-        hints.update(getattr(obj, '__annotations__', {}))
-        if not hints:
-            hints.update(_get_comment_type_hints(obj, globalns, localns))
-        defaults = _get_func_defaults(obj)
+        globalns, localns = _get_namespace(obj, globalns, localns)
+        hints = _get_comment_type_hints(obj, globalns, localns)
         for name, value in six.iteritems(hints):
             if value is None:
                 value = type(None)
-            if isinstance(value, six.string_types):
+            elif isinstance(value, _STRING_TYPES):
                 value = _ForwardRef(value)
-            value = _eval_type(
-                value, globalns, localns)
-            is_optional = bool(name in defaults and defaults[name] is None)
-            if is_optional:
-                value = Optional[value]
-            hints[name] = value
+            hints[name] = _eval_type(value, globalns, localns)
     return hints
 
 
@@ -129,10 +128,117 @@ def _get_namespace(obj,  # type: Any
     return globalns, localns
 
 
-def _get_comment_type_hints(func,  # type: Callable[..., Any]
+def _get_type_comments(source):
+    # type: (str) -> Generator[Tuple[str, str, Any], None, None]
+    """Yield type hint comments from the source code.
+
+    Args:
+        source: The source code of the function to search for type hint
+            comments.
+
+    Yields:
+        All type comments that come before the body of the function as
+        (name, type) pairs, where the name is the name of the variable and
+        type is the type hint. If a short-form type hint is reached, it is
+        yielded as a single string containing the entire type hint.
+    """
+    reader = six.StringIO(inspect.cleandoc(source)).readline
+    name = last_token = None
+    tokens = tokenize.generate_tokens(reader)
+    is_func = source.startswith('def')
+    indent_level = 0
+    for token, value, _, _, _ in tokens:
+        if is_func and token == tokenize.INDENT:
+            return
+        elif token == tokenize.DEDENT:
+            indent_level -= 1
+        elif token == tokenize.NAME:
+            if value in ('def', 'class'):
+                indent_level += 1
+            elif last_token != tokenize.OP:
+                name = value
+        elif token == tokenize.COMMENT and indent_level == 1:
+            match = re.match(r'#\s*type:(.+)', value)
+            if match:
+                type_sig = match.group(1).strip()
+                if '->' in type_sig and last_token == tokenize.NEWLINE:
+                    name, type_sig = type_sig.split('->', 1)
+                    yield name.strip(), type_sig.strip()
+                elif name:
+                    yield name.strip(), type_sig.strip()
+                name = None
+        last_token = token
+
+
+def _get_comment_type_hints(obj,  # type: Any
                             globalns,  # type: Dict[str, Any]
                             localns  # type: Dict[str, Any]
                             ):
+    # type: (...) -> Dict[str, Any]
+    """Get a mapping of any names to type hints from type hint comments.
+
+    Args:
+        obj: The object to search for type hint comments.
+
+    Returns:
+        A dictionary mapping names to the type hints found in comments.
+    """
+    if isinstance(obj, (types.FunctionType, types.MethodType)):
+        return _get_func_type_hints(obj, globalns, localns)
+    if isinstance(obj, type):
+        return _get_class_type_hints(obj, globalns, localns)
+    if isinstance(obj, types.ModuleType):
+        try:
+            source = inspect.getsource(obj)
+        except (IOError, TypeError):
+            return {}
+    else:
+        source = obj
+    hints = {}
+    for name, value in _get_type_comments(source):
+        hints[name] = value
+    return hints
+
+
+def _get_class_type_hints(type_,  # type: Type
+                          globalns,  # type: Dict[str, Any]
+                          localns  # type: Dict[str, Any]
+                          ):
+    # type: (...) -> Dict[str, Any]
+    """Get a mapping of class attr names to type hints from type hint comments.
+
+    Args:
+        type_: The class object to search for type hint comments.
+
+    Returns:
+        A dictionary mapping the class attribute names to the type hints found
+        for each class attribute in the type hint comments.
+    """
+    hints = {}
+    for base in reversed(type_.__mro__):
+        if globalns is None:
+            try:
+                base_globals = sys.modules[base.__module__].__dict__
+            except KeyError:
+                base_globals = globalns
+        else:
+            base_globals = globalns
+        base_hints = vars(base).get('__annotations__', {})
+        if not base_hints:
+            try:
+                source = inspect.getsource(base)
+                ns = localns if base is type_ else {}
+                base_hints = _get_comment_type_hints(source, base_globals, ns)
+            except (IOError, TypeError):
+                pass
+        hints.update(base_hints)
+    return hints
+
+
+def _get_func_type_hints(func,  # type: Callable[..., Any]
+                         globalns,  # type: Dict[str, Any]
+                         localns  # type: Dict[str, Any]
+                         ):
     # type: (...) -> Dict[str, Any]
     """Get a mapping of parameter names to type hints from type hint comments.
 
@@ -154,8 +260,6 @@ def _get_comment_type_hints(func,  # type: Callable[..., Any]
     signature = list(full_signature[0]) + [s for s in full_signature[1:3] if s]
     for comment in _get_type_comments(source):
         name, value = comment
-        name = name.strip()
-        value = value.strip()
         if name in signature:
             hints[name] = value
         elif name.startswith('(') and name.endswith(')'):
@@ -165,6 +269,10 @@ def _get_comment_type_hints(func,  # type: Callable[..., Any]
                 signature = signature[1:]
             if len(type_values) == len(signature):
                 hints.update(zip(signature, type_values))
+    defaults = _get_func_defaults(func)
+    for name, value in six.iteritems(hints):
+        if name in defaults and defaults[name] is None:
+            hints[name] = Optional[value]
     return hints
 
 
@@ -185,40 +293,6 @@ def _get_func_defaults(func):
     if not hasattr(_func_like, '__kwdefaults__'):
         _func_like.__kwdefaults__ = {}
     return _get_defaults(_func_like)
-
-
-def _get_type_comments(source):
-    # type: (str) -> Generator[Tuple[str, str], None, None]
-    """Yield type hint comments from the source code.
-
-    Args:
-        source: The source code of the function to search for type hint
-            comments.
-
-    Yields:
-        All type comments that come before the body of the function as
-        (name, type) pairs, where the name is the name of the variable and
-        type is the type hint. If a short-form type hint is reached, it is
-        yielded as a single string containing the entire type hint.
-    """
-    reader = six.StringIO(inspect.cleandoc(source)).readline
-    name = last_token = None
-    tokens = tokenize.generate_tokens(reader)
-    for token, value, _, _, _ in tokens:
-        if token in (tokenize.INDENT, tokenize.DEDENT):
-            return
-        if token == tokenize.NAME and last_token != tokenize.OP:
-            name = value
-        elif token == tokenize.COMMENT:
-            match = re.match(r'#\s*type:(.+)', value)
-            if match:
-                type_sig = match.group(1).strip()
-                if '->' in type_sig and last_token == tokenize.NEWLINE:
-                    yield type_sig.split('->')
-                elif name:
-                    yield name, type_sig
-                    name = None
-        last_token = token
 
 
 def _parse_short_form(comment, globalns, localns):

@@ -67,7 +67,7 @@ def test_long_form():
     def func(arg1,
              arg2,  # type: int
              arg3,  # type: str
-             arg4 = None  # type: str
+             arg4=None  # type: str
              ):
         # type: (...) -> bool
         pass
@@ -86,7 +86,7 @@ def test_no_source():
 
 
 def test_method():
-    """Test that typed class objects are handled correctly."""
+    """Test that typed class method objects are handled correctly."""
     class TestClass(object):
 
         def typed(self, arg1):
@@ -105,4 +105,88 @@ def test_method():
     assert get_type_hints(TestClass.untyped) == {
         'return': type(None),
         'arg1': int
+    }
+
+
+def test_class():
+    """Test that typed class objects are parsed correctly."""
+    class TestClass1(object):
+        arg1 = None  # type: int
+        arg2 = None  # type: str
+
+    assert get_type_hints(TestClass1) == {
+        'arg1': int,
+        'arg2': str
+    }
+
+
+def test_nested_class():
+    """Test that nested typed class objects are parsed correctly."""
+    class TestClass2(object):
+        arg1 = None  # type: int
+        arg2 = None  # type: str
+
+        class TestClass3(object):
+            pass
+
+        def func(self, value):
+            # type: (int) -> None
+
+            class TestClass4(object):
+                arg4 = None  # type: int
+
+                def func(self, value):
+                    # type: (int) -> None
+
+                    class TestClass5(object):
+                        arg5 = None  # type: int
+
+                arg6 = None  # type: bool
+
+        arg3 = None  # type: bool
+
+    assert get_type_hints(TestClass2) == {
+        'arg1': int,
+        'arg2': str,
+        'arg3': bool
+    }
+
+
+def test_inherited_class():
+    """Test that type hints are inherited by derived classes."""
+    class TestClass6(object):
+        arg1 = None  # type: int
+
+    class TestClass7(TestClass6):
+        pass
+
+    assert get_type_hints(TestClass7) == {
+        'arg1': int,
+    }
+
+
+def test_inherited_class_append():
+    """Test that type hints are appended to base class type hints."""
+    class TestClass8(object):
+        arg1 = None  # type: int
+
+    class TestClass9(TestClass8):
+        arg2 = None  # type: str
+
+    assert get_type_hints(TestClass9) == {
+        'arg1': int,
+        'arg2': str
+    }
+
+
+def test_inherited_class_override():
+    """Test that type hints shadow base class type hints."""
+    class TestClass10(object):
+        arg1 = None  # type: int
+
+    class TestClass11(TestClass10):
+        arg1 = None  # type: str
+
+    assert get_type_hints(TestClass11) == {
+        'arg1': str
     }

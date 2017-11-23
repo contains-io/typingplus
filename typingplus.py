@@ -27,10 +27,87 @@ import types
 import pkg_resources
 import six
 
-_typing_backport_version = tuple(
+if 0:  # pylint: disable=using-constant-test
+    # Assure names exist so typingplus connsumers don't get linting errors.
+    class _Undefined(object):
+        """A class with the methods expected of objects in this library."""
+
+        def __call__(self, *args, **kwargs):
+            """Do nothing."""
+            pass
+
+        __getitem__ = __call__
+
+
+    _UNDEFINED = _Undefined()
+
+    AbstractSet = _UNDEFINED
+    Any = _UNDEFINED
+    AnyStr = _UNDEFINED
+    AsyncContextManager = _UNDEFINED
+    AsyncGenerator = _UNDEFINED
+    AsyncIterable = _UNDEFINED
+    AsyncIterator = _UNDEFINED
+    Awaitable = _UNDEFINED
+    ByteString = _UNDEFINED
+    Callable = _UNDEFINED
+    ChainMap = _UNDEFINED
+    ClassVar = _UNDEFINED
+    Collection = _UNDEFINED
+    Container = _UNDEFINED
+    ContextManager = _UNDEFINED
+    Coroutine = _UNDEFINED
+    Counter = _UNDEFINED
+    DefaultDict = _UNDEFINED
+    Deque = _UNDEFINED
+    Dict = _UNDEFINED
+    FrozenSet = _UNDEFINED
+    Generator = _UNDEFINED
+    Generic = _UNDEFINED
+    GenericMeta = _UNDEFINED
+    Hashable = _UNDEFINED
+    ItemsView = _UNDEFINED
+    Iterable = _UNDEFINED
+    Iterator = _UNDEFINED
+    KeysView = _UNDEFINED
+    List = _UNDEFINED
+    Mapping = _UNDEFINED
+    MappingView = _UNDEFINED
+    MutableMapping = _UNDEFINED
+    MutableSequence = _UNDEFINED
+    MutableSet = _UNDEFINED
+    NamedTuple = _UNDEFINED
+    NewType = _UNDEFINED
+    Optional = _UNDEFINED
+    Protocol = _UNDEFINED
+    Reversible = _UNDEFINED
+    Sequence = _UNDEFINED
+    Set = _UNDEFINED
+    Sized = _UNDEFINED
+    SupportsAbs = _UNDEFINED
+    SupportsBytes = _UNDEFINED
+    SupportsComplex = _UNDEFINED
+    SupportsFloat = _UNDEFINED
+    SupportsInt = _UNDEFINED
+    SupportsRound = _UNDEFINED
+    TYPE_CHECKING = _UNDEFINED
+    Text = _UNDEFINED
+    Tuple = _UNDEFINED
+    Type = _UNDEFINED
+    TypeVar = _UNDEFINED
+    Union = _UNDEFINED
+    ValuesView = _UNDEFINED
+    cast = _UNDEFINED
+    get_type_hints = _UNDEFINED
+    no_type_check = _UNDEFINED
+    no_type_check_decorator = _UNDEFINED
+    overload = _UNDEFINED
+    runtime = _UNDEFINED
+
+_TYPING_BACKPORT_VERSION = tuple(
     int(v) for v in pkg_resources.get_distribution('typing').version.split('.')
 )
-if (3, 5) <= sys.version_info < _typing_backport_version:
+if (3, 5) <= sys.version_info < _TYPING_BACKPORT_VERSION:
     # Load the typing backport instead of the built-in typing library.
     #
     # In order to assure that the latest version (backport) is loaded from
@@ -51,9 +128,9 @@ globals().update(  # Super wildcard import.
     {k: v for k, v in six.iteritems(vars(typing_extensions))
      if k not in globals()}
 )
-globals()['__all__'] += tuple(str(v) for v in globals()['__all__'])
+globals()['__all__'] = tuple(set(str(v) for v in globals()['__all__']))
 
-globals()['__all__'] += ('is_instance',)
+globals()['__all__'] += ('is_instance', 'eval_type')
 
 _get_type_hints = typing.get_type_hints
 
@@ -484,3 +561,20 @@ def _cast_string(type_, obj):
     if issubclass(type_, six.string_types) and isinstance(obj, ByteString):
         return obj.decode(encoding)
     return obj
+
+
+def eval_type(type_, globalns=None, localns=None):
+    """Evaluate the type. If the type is string, evaluate it with _ForwardRef.
+
+    Args:
+        type_: The type to evaluate.
+        globalns: The currently known global namespace.
+        localns: The currently known local namespace.
+
+    Returns:
+        The evaluated type.
+    """
+    globalns, localns = _get_namespace(type_, globalns, localns)
+    if isinstance(type_, six.string_types):
+        type_ = _ForwardRef(type_)
+    return _eval_type(type_, globalns, localns)

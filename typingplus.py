@@ -6,6 +6,7 @@ and typing_extensions modules export.
 
 Functions:
     cast: Casts a value to a specific type.
+    eval_type: Evaluates a type, or a string of the type.
     get_type_hints: Gets all type hints for an object, including comment type
         hints.
     is_instance: An implementation of isinstance that works with the type

@@ -33,12 +33,6 @@ Features
   ``typing`` module.
 
 
-Upcoming Features
------------------
-
-- Comment type hints for classes.
-
-
 Usage
 -----
 

@@ -11,6 +11,8 @@ Functions:
         hints.
     is_instance: An implementation of isinstance that works with the type
         definitions from the typing library.
+    upgrade_typing: Globally replaces the stdlib version of typing with the
+        latest version.
 """
 # pragma pylint: disable=undefined-variable
 
@@ -117,9 +119,6 @@ if (3, 5) <= sys.version_info < _TYPING_BACKPORT_VERSION:
     _path = list(reversed(sys.path))
     _mod_info = imp.find_module('typing', _path)
     typing = imp.load_module('typing', *_mod_info)
-    sys.modules['typing'] = typing
-    sys.modules['typing.io'] = typing.io
-    sys.modules['typing.re'] = typing.re
 else:
     import typing
 globals().update(  # Super wildcard import.
@@ -143,6 +142,14 @@ _STRING_TYPES = six.string_types + (ByteString,)
 if collections.deque not in MutableSequence._abc_registry:
     # Deque is not registered in some versions of the typing library.
     MutableSequence.register(collections.deque)
+
+
+def upgrade_typing():
+    # type: () -> None
+    """Set the module retrieved from "import typing" to the latest version."""
+    sys.modules['typing'] = typing
+    sys.modules['typing.io'] = typing.io
+    sys.modules['typing.re'] = typing.re
 
 
 def get_type_hints(obj,  # type: Any

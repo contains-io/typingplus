@@ -27,10 +27,12 @@ Features
 - ``typing_extensions`` is integrated to be as compatible with the future of the
   ``typing`` module as possible.
 - Support for comment type hints.
-- A functional cast method, including to the abstract types defined in the
+- A functional cast function, including to the abstract types defined in the
   ``typing`` module.
-- An is_instance method that works with the abstract types defined in the
+- An is_instance function that works with the abstract types defined in the
   ``typing`` module.
+- An upgrade_typing function that will replace the stdlib version of ``typing``
+  with the latest version from either the stdlib or the backport.
 
 
 Usage

@@ -117,6 +117,9 @@ if (3, 5) <= sys.version_info < _TYPING_BACKPORT_VERSION:
     _path = list(reversed(sys.path))
     _mod_info = imp.find_module('typing', _path)
     typing = imp.load_module('typing', *_mod_info)
+    sys.modules['typing'] = typing
+    sys.modules['typing.io'] = typing.io
+    sys.modules['typing.re'] = typing.re
 else:
     import typing
 globals().update(  # Super wildcard import.

@@ -137,8 +137,9 @@ _get_type_hints = typing.get_type_hints
 
 _STRING_TYPES = six.string_types + (ByteString,)
 
-# Deque is not registered in some versions of the typing library.
-MutableSequence.register(collections.deque)
+if collections.deque not in MutableSequence._abc_registry:
+    # Deque is not registered in some versions of the typing library.
+    MutableSequence.register(collections.deque)
 
 
 def get_type_hints(obj,  # type: Any

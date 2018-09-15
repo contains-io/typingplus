@@ -41,7 +41,6 @@ if 0:  # pylint: disable=using-constant-test
 
         __getitem__ = __call__
 
-
     _UNDEFINED = _Undefined()
 
     AbstractSet = _UNDEFINED
@@ -64,6 +63,7 @@ if 0:  # pylint: disable=using-constant-test
     DefaultDict = _UNDEFINED
     Deque = _UNDEFINED
     Dict = _UNDEFINED
+    ForwardRef = _UNDEFINED
     FrozenSet = _UNDEFINED
     Generator = _UNDEFINED
     Generic = _UNDEFINED
@@ -81,6 +81,7 @@ if 0:  # pylint: disable=using-constant-test
     MutableSet = _UNDEFINED
     NamedTuple = _UNDEFINED
     NewType = _UNDEFINED
+    NoReturn = _UNDEFINED
     Optional = _UNDEFINED
     Protocol = _UNDEFINED
     Reversible = _UNDEFINED
@@ -107,14 +108,16 @@ if 0:  # pylint: disable=using-constant-test
     overload = _UNDEFINED
     runtime = _UNDEFINED
 
-_TYPING_BACKPORT_VERSION = tuple(
-    int(v) for v in pkg_resources.get_distribution('typing').version.split('.')
+_TYPING_BACKPORT_VERSION = (0, 0) if sys.version_info >= (3, 7) else tuple(
+    int(v) for v in
+    pkg_resources.get_distribution('typing').version.split('.')
 )
+
 if (3, 5) <= sys.version_info < _TYPING_BACKPORT_VERSION:
-    # Load the typing backport instead of the built-in typing library.
-    #
-    # In order to assure that the latest version (backport) is loaded from
-    # site-packages sys.path must be reversed.
+        # Load the typing backport instead of the built-in typing library.
+        #
+        # In order to assure that the latest version (backport) is loaded from
+        # site-packages sys.path must be reversed.
     import imp
     _path = list(reversed(sys.path))
     _mod_info = imp.find_module('typing', _path)
@@ -126,22 +129,24 @@ globals().update(  # Super wildcard import.
 )
 globals()['__all__'] = tuple(str(v) for v in globals()['__all__'])
 
-import typing_extensions  # pylint: disable=wrong-import-position
-globals().update(  # Super wildcard import.
-    {k: v for k, v in six.iteritems(vars(typing_extensions))
-     if k not in globals()}
-)
-globals()['__all__'] = tuple(set(str(v) for v in globals()['__all__']))
+if (3, 5) <= sys.version_info < _TYPING_BACKPORT_VERSION:
+    import typing_extensions  # pylint: disable=wrong-import-position
+    globals().update(  # Super wildcard import.
+        {k: v for k, v in six.iteritems(vars(typing_extensions))
+         if k not in globals()}
+    )
+    globals()['__all__'] = tuple(set(str(v) for v in globals()['__all__']))
 
 globals()['__all__'] += ('is_instance', 'eval_type')
 
 _get_type_hints = typing.get_type_hints
 
-_STRING_TYPES = six.string_types + (ByteString,)
+_STRING_TYPES = six.string_types + (ByteString, bytes, bytearray)
 
-if collections.deque not in MutableSequence._abc_registry:
-    # Deque is not registered in some versions of the typing library.
-    MutableSequence.register(collections.deque)
+# Deque is not registered in some versions of the typing library.
+MutableSequence.register(collections.deque)
+
+ForwardRef = globals().get('ForwardRef', globals().get('_ForwardRef'))
 
 
 def upgrade_typing():
@@ -187,7 +192,7 @@ def get_type_hints(obj,  # type: Any
             if value is None:
                 value = type(None)
             elif isinstance(value, _STRING_TYPES):
-                value = _ForwardRef(value)
+                value = ForwardRef(value)
             hints[name] = _eval_type(value, globalns, localns)
     return hints
 
@@ -239,7 +244,7 @@ def _get_type_comments(source):
     for token, value, _, _, _ in tokens:
         if is_func and token == tokenize.INDENT:
             return
-        elif token == tokenize.DEDENT:
+        if token == tokenize.DEDENT:
             indent_level -= 1
         elif token == tokenize.NAME:
             if value in ('def', 'class'):
@@ -417,12 +422,15 @@ def cast(tp, obj):
     """
     if is_instance(obj, tp):
         return obj
+    type_repr = repr(tp)
     obj_repr = repr(obj)
-    if isinstance(tp, type):
-        if issubclass(tp, _STRING_TYPES):
-            obj = _cast_string(tp, obj)
-        elif hasattr(tp, '__args__') and tp.__args__:
-            obj = _cast_iterables(tp, obj)
+    if tp in _STRING_TYPES:
+        obj = _cast_string(tp, obj)
+        if is_instance(obj, tp):
+            return obj
+    if (hasattr(tp, '__origin__') and
+            tp.__origin__ or hasattr(tp, '__args__') and tp.__args__):
+        obj = _cast_iterables(tp, obj)
     for type_ in _get_cast_types(tp):
         try:
             args = getattr(type_, '__args__', None)
@@ -432,7 +440,6 @@ def cast(tp, obj):
             return type_(obj)
         except Exception as e:  # pylint: disable=broad-except,unused-variable
             pass
-    type_repr = repr(tp)
     six.raise_from(
         TypeError("Cannot convert {} to {}.".format(obj_repr, type_repr)),
         locals().get('e')
@@ -449,12 +456,14 @@ def _get_cast_types(type_):
     Returns:
         A list of all callable type constraints for the type.
     """
-    cast_types = [type_] if callable(type_) else []
+    cast_types = [type_] if callable(
+        type_) and type_.__module__ != 'typing' else []
     if (hasattr(type_, '__constraints__') and
             isinstance(type_.__constraints__, Iterable)):
         cast_types.extend(type_.__constraints__)
     if (hasattr(type_, '__args__') and
-            isinstance(type_.__args__, Iterable)):
+            isinstance(type_.__args__, Iterable) and
+            not _is_subclass(type_, Mapping)):
         cast_types.extend(type_.__args__)
     if hasattr(type_, '_abc_registry'):
         cast_types.extend(sorted(  # Give list and tuple precedence.
@@ -469,6 +478,16 @@ def _get_cast_types(type_):
                 type_.__extra__._abc_registry,
                 key=lambda k: k.__name__,
                 reverse=True))
+    if hasattr(type_, '__origin__') and type_.__origin__:
+        cast_types.append(type_.__origin__)
+    try:
+        type_name = vars(type_).get('_name')
+        if type_name == 'MutableSequence':
+            cast_types.insert(0, list)
+        elif type_name == 'MutableSet':
+            cast_types.insert(0, set)
+    except TypeError:
+        pass
     return cast_types
 
 
@@ -486,24 +505,25 @@ def is_instance(obj, type_):
     Returns:
         True if the object is an instance of the type; otherwise, False.
     """
-    if type_ == Any:
+    if type_ == Any or type_ is ByteString and isinstance(
+            obj, (bytes, bytearray)):
         return True
     if isinstance(type_, type):
         if hasattr(type_, '__args__') and type_.__args__:
             generic_type = (type_.__origin__ if hasattr(
                 type_, '__origin__') and type_.__origin__ else type_)
-            if issubclass(type_, tuple) and Ellipsis not in type_.__args__:
+            if _is_subclass(type_, tuple) and Ellipsis not in type_.__args__:
                 return (len(obj) == len(type_.__args__) and
                         isinstance(obj, generic_type) and all(
                             is_instance(val, typ) for typ, val in
                             zip(type_.__args__, obj)))
-            elif issubclass(type_, Mapping):
+            if _is_subclass(type_, Mapping):
                 return isinstance(obj, generic_type) and all(
                     is_instance(k, type_.__args__[0]) and
                     is_instance(v, type_.__args__[1]) for
                     k, v in six.iteritems(obj)
                 )
-            elif issubclass(type_, Iterable):
+            if _is_subclass(type_, Iterable):
                 return isinstance(obj, generic_type) and all(
                     is_instance(v, type_.__args__[0]) for v in obj)
         elif isinstance(obj, type_):
@@ -527,18 +547,20 @@ def _cast_iterables(type_, obj):
         original object, or a generator that casts all items within the object
         if the object is a container.
     """
-    if issubclass(type_, tuple) and Ellipsis not in type_.__args__:
+    if not type_.__args__ or TypeVar in (type(t) for t in type_.__args__):
+        return obj
+    if _is_subclass(type_, tuple) and Ellipsis not in type_.__args__:
         if len(obj) == len(type_.__args__):
             return [cast(typ, val) for typ, val in zip(type_.__args__, obj)]
         raise TypeError(
             'The number of elements [{}] does not match the type {}'.format(
                 len(obj), repr(type_)))
-    if issubclass(type_, Mapping):
+    if _is_subclass(type_, Mapping):
         return {
             cast(type_.__args__[0], k): cast(type_.__args__[1], v)
             for k, v in six.iteritems(obj)
         }
-    if issubclass(type_, Iterable):
+    if _is_subclass(type_, Iterable):
         return [cast(type_.__args__[0], v) for v in obj]
     return obj
 
@@ -565,18 +587,47 @@ def _cast_string(type_, obj):
         __bytes__ method, or the object needs to be encoded or decoded.
     """
     encoding = sys.stdin.encoding or sys.getdefaultencoding()
-    if issubclass(type_, ByteString):
+    if _is_subclass(type_, ByteString):
         if not hasattr(obj, '__bytes__'):
             obj = str(obj)
         if isinstance(obj, six.string_types):
-            return obj.encode(encoding)
-    if issubclass(type_, six.string_types) and isinstance(obj, ByteString):
+            bytestr = obj.encode(encoding)
+            if _is_subclass(type_, bytearray):
+                return bytearray(bytestr)
+            return bytestr
+    if _is_subclass(type_, six.string_types) and isinstance(obj, ByteString):
         return obj.decode(encoding)
     return obj
 
 
+def _is_subclass(type_, class_or_tuple):
+    # type: (Type, Union[Type, Tuple]) -> bool
+    """Determine if the type is a subclass of the given class or classes.
+
+    This takes __origin__ classes into consideration and does not raise.
+
+    Args:
+        type_: The type that may be a subclass.
+        class_or_tuple: A type or a tuple containing multiple types of which
+            type_ may be a subclass.
+
+    Returns:
+        A boolean indicating whether the given type is a subclass of the
+    """
+    try:
+        return issubclass(type_, class_or_tuple)
+    except TypeError:
+        pass
+    if hasattr(type_, '__origin__') and type_.__origin__:
+        try:
+            return issubclass(type_.__origin__, class_or_tuple)
+        except TypeError:
+            pass
+    return False
+
+
 def eval_type(type_, globalns=None, localns=None):
-    """Evaluate the type. If the type is string, evaluate it with _ForwardRef.
+    """Evaluate the type. If the type is string, evaluate it with ForwardRef.
 
     Args:
         type_: The type to evaluate.
@@ -588,5 +639,5 @@ def eval_type(type_, globalns=None, localns=None):
     """
     globalns, localns = _get_namespace(type_, globalns, localns)
     if isinstance(type_, six.string_types):
-        type_ = _ForwardRef(type_)
+        type_ = ForwardRef(type_)
     return _eval_type(type_, globalns, localns)

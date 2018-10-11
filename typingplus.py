@@ -616,12 +616,12 @@ def _is_subclass(type_, class_or_tuple):
     """
     try:
         return issubclass(type_, class_or_tuple)
-    except TypeError:
+    except (TypeError, AttributeError):
         pass
     if hasattr(type_, '__origin__') and type_.__origin__:
         try:
             return issubclass(type_.__origin__, class_or_tuple)
-        except TypeError:
+        except (TypeError, AttributeError):
             pass
     return False
 
